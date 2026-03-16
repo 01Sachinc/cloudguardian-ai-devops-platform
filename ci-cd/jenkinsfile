@@ -1,0 +1,86 @@
+pipeline {
+    agent any
+    
+    environment {
+        AWS_REGION = 'us-east-1'
+        ECR_REPOSITORY = 'ai-devops-app'
+        EKS_CLUSTER_NAME = 'ai-devops-cluster'
+        ECR_REGISTRY = credentials('aws-account-id') + '.dkr.ecr.' + env.AWS_REGION + '.amazonaws.com'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Dependency Check') {
+            steps {
+                sh 'npm ci'
+            }
+        }
+
+        stage('Tests & Linting') {
+            steps {
+                sh 'npm test'
+                sh 'npm run lint'
+            }
+        }
+        
+        stage('Docker Build Image') {
+            steps {
+                script {
+                    dockerImage = docker.build("${env.ECR_REGISTRY}/${env.ECR_REPOSITORY}:${env.BUILD_ID}", "-f docker/Dockerfile .")
+                }
+            }
+        }
+        
+        stage('Push to ECR') {
+            steps {
+                script {
+                    sh "aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${env.ECR_REGISTRY}"
+                    dockerImage.push()
+                    dockerImage.push('latest')
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    sh "aws eks update-kubeconfig --name ${env.EKS_CLUSTER_NAME} --region ${env.AWS_REGION}"
+                    sh "sed -i 's|\\${ECR_REGISTRY}/\\${ECR_REPOSITORY}:\\${IMAGE_TAG}|${env.ECR_REGISTRY}/${env.ECR_REPOSITORY}:${env.BUILD_ID}|g' kubernetes/deployment.yaml"
+                    sh "kubectl apply -f kubernetes/deployment.yaml"
+                    sh "kubectl apply -f kubernetes/service.yaml"
+                }
+            }
+        }
+
+        stage('Post-Deploy AI Validation') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'MONITORING_API_KEY', variable: 'API_KEY')]) {
+                        sh """
+                        curl -X POST https://monitoring.ai-devops-platform.com/api/v1/trigger-scan \
+                        -H "Authorization: Bearer $API_KEY" \
+                        -d '{"deployment_id": "${env.BUILD_ID}"}'
+                        """
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline successfully completed.'
+        }
+        failure {
+            echo 'Pipeline failed. Check logs for details.'
+        }
+    }
+}
