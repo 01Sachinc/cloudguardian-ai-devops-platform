@@ -35,7 +35,38 @@ This repository is designed to showcase mastery over modern software delivery pi
 
 The application follows a stateless microservice architecture decoupled from its stateful data stores (PostgreSQL / Redis), scaling dynamically within Kubernetes. 
 
-![System Architecture](architecture/system-architecture.png)
+```mermaid
+graph TD
+    subgraph "Public Internet"
+        User((User))
+    end
+
+    subgraph "AWS Cloud - VPC"
+        subgraph "Public Subnets"
+            IGW[Internet Gateway]
+            ALB[Application Load Balancer]
+        end
+
+        subgraph "Private Subnets"
+            subgraph "EKS Cluster"
+                Service[K8s Service]
+                subgraph "Worker Nodes"
+                    Pods[App Pods]
+                end
+            end
+            
+            DB[(PostgreSQL)]
+            Redis[(Redis)]
+        end
+    end
+
+    User --> IGW
+    IGW --> ALB
+    ALB --> Service
+    Service --> Pods
+    Pods --> DB
+    Pods --> Redis
+```
 
 _For a deep dive, read the [Architecture Overview](docs/architecture-overview.md)._
 
@@ -49,7 +80,24 @@ _For a deep dive, read the [Architecture Overview](docs/architecture-overview.md
 6. **Observe:** Metric endpoints are scraped by Prometheus, feeding into Grafana dashboards.
 7. **Analyze:** AI-Engine validates system stability post-deployment.
 
-![DevOps Pipeline](architecture/devops-pipeline-flow.png)
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant GitHub as GitHub Repo
+    participant Actions as GitHub Actions/CI
+    participant ECR as Amazon ECR
+    participant EKS as Amazon EKS (Cluster)
+    participant AI as AI Monitoring Engine
+
+    Dev->>GitHub: Push Code
+    GitHub->>Actions: Trigger Pipeline
+    Actions->>Actions: Build & Test
+    Actions->>ECR: Push Docker Image
+    Actions->>EKS: Update Deployment (Manifest)
+    EKS->>EKS: Rolling Update Pods
+    Actions->>AI: Trigger Stability Check
+    AI-->>Actions: Analysis Results
+```
 
 _For details, see the [Pipeline Workflow Documentation](docs/pipeline-workflow.md)._
 
@@ -61,7 +109,30 @@ Prometheus is configured with sophisticated Service Discovery targeting Kubernet
 - **Error Rates**
 - **Saturation (CPU / Memory)**
 
-![Monitoring Dashboard](architecture/monitoring-architecture.png)
+```mermaid
+graph LR
+    subgraph "Kubernetes Cluster"
+        App[Application Pods]
+        Exporter[Node Exporter]
+        Prom[Prometheus Server]
+    end
+
+    subgraph "Visualization & Analysis"
+        Grafana[Grafana Dashboards]
+        AIEngine[AI Monitoring Engine]
+    end
+
+    subgraph "Alerting"
+        Alert[Slack / PagerDuty]
+    end
+
+    App -- "Metrics (/metrics)" --> Prom
+    Exporter -- "Node Metrics" --> Prom
+    Prom -- "Query" --> Grafana
+    Prom -- "Data Stream" --> AIEngine
+    AIEngine -- "Anomalies" --> Alert
+    Grafana -- "Visual Alerts" --> Alert
+```
 
 _Learn more in the [Monitoring System Guide](docs/monitoring-system.md)._
 

@@ -26,4 +26,23 @@ This project embodies a state-of-the-art **AI-Driven DevOps Automation Platform*
    - **AI Engine**: Python-based log analysis and anomaly detection stream metrics to predict incidents before they impact users.
 
 ---
-![System Architecture](../architecture/system-architecture.png)
+```mermaid
+graph TD
+    subgraph "Cloud Strategy"
+        Provision[Terraform IaC] --> VPC[AWS Virtual Private Cloud]
+        VPC --> Subnets[Public & Private Subnets]
+    end
+
+    subgraph "Compute & Scaling"
+        EKS[Amazon EKS Cluster]
+        EKS --> Nodes[Managed Node Groups]
+        Nodes --> Pods[Application Microservices]
+    end
+
+    subgraph "Security"
+        IAM[IAM Roles for Service Accounts]
+        Secrets[K8s Secrets Management]
+    end
+
+    VPC --> EKS
+```

@@ -18,4 +18,21 @@ A robust observability stack is crucial for enterprise systems. This platform ut
    - While a full ELK stack is massive, we simulate centralized logging by tailing application outputs which are then ingested by our custom AI Engine for immediate analysis.
 
 ---
-![Monitoring Architecture](../architecture/monitoring-architecture.png)
+```mermaid
+graph TD
+    subgraph "Observability Layer"
+        Exporter[Prometheus Exporters] --> |Scrape| Prom[Prometheus Server]
+        Prom --> |Storage| TSDB[(Time Series DB)]
+        TSDB --> |Query| Grafana[Grafana UI]
+    end
+
+    subgraph "AI Integration"
+        Prom --> |Export| AIEngine[Python ML Engine]
+        AIEngine --> |Log Analysis| Logs[Application Logs]
+    end
+
+    subgraph "Incident Management"
+        Grafana --> |Threshold| Slack[Slack Alerts]
+        AIEngine --> |Anomaly| PagerDuty[Auto-Remediation]
+    end
+```
